@@ -7,19 +7,25 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include"heap.h"
+
+#ifndef SZ_SIZE
+#define SZ_SIZE 8
+
+#endif
 
 void show_chunk(void *chunk_ptr, int free_flag)
 {
-    unsigned long int chunk_size = *(unsigned long int*)(chunk_ptr - 8);
+    unsigned long int chunk_size = *(unsigned long int*)(chunk_ptr - SZ_SIZE);
     unsigned long int true_size = chunk_size & 0xfffffffffffffff8;
-    unsigned long int prev_chunk_size = *(unsigned long int*)(chunk_ptr - 16);
+    unsigned long int prev_chunk_size = *(unsigned long int*)(chunk_ptr - SZ_SIZE * 2);
     unsigned long int fd = *(unsigned long int*)(chunk_ptr);
-    unsigned long int bk = *(unsigned long int*)(chunk_ptr + 8);
-    puts("------------------------------------------");
-    printf("Chunk position: 0x%lx\n", (unsigned long)chunk_ptr - 0x10);
+    unsigned long int bk = *(unsigned long int*)(chunk_ptr + SZ_SIZE);
+    puts("----------------------");
+    printf("Chunk position: 0x%lx\n", (unsigned long)chunk_ptr - SZ_SIZE * 2);
     printf("Chunk size: 0x%lx\n", true_size);
 
-    if (true_size > 0x80)
+    if (true_size > 0x80) // Chunks in fastbin range ignore in-use bit.
     {
         printf("The previous chunk in-use? ");
         if (chunk_size & 1)
@@ -41,7 +47,7 @@ void show_chunk(void *chunk_ptr, int free_flag)
             printf("BK(normalbin): 0x%lx\n", bk);
         }
     }
-    puts("------------------------------------------");
+    puts("----------------------");
     puts("");
 }
 
