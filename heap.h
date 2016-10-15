@@ -13,4 +13,6 @@
 
 #endif
 
+extern struct malloc_state;
+
 void show_chunk(void *chunk_ptr, int free_flag);
