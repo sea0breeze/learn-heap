@@ -74,11 +74,50 @@ typedef struct chunk
 
 #define NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)
 
+#define NBINS             128
+
+ /*
+   Binmap
+
+    To help compensate for the large number of bins, a one-level index
+    structure is used for bin-by-bin searching.  `binmap' is a
+    bitvector recording whether bins are definitely empty so they can
+    be skipped over during during traversals.  The bits are NOT always
+    cleared as soon as bins are empty, but instead only
+    when they are noticed to be empty during traversal in malloc.
+ */
+
+/* Conservatively use 32 bits per map word, even if on 64bit system */
+#define BINMAPSHIFT      5
+#define BITSPERMAP       (1U << BINMAPSHIFT)
+#define BINMAPSIZE       (NBINS / BITSPERMAP)
+
+#define idx2block(i)     ((i) >> BINMAPSHIFT)
+#define idx2bit(i)       ((1U << ((i) & ((1U << BINMAPSHIFT) - 1))))
+
 
 struct malloc_state
 {
     pthread_mutex_t mutex;
+    int flags;
     chunk *fastbinsY[NFASTBINS];
+    chunk *top;
+    chunk *last_remainder;
+    chunk *bins[NBINS * 2 - 2];
+    unsigned int binmap[BINMAPSIZE];
+
+    struct malloc_state *next;
+    struct malloc_state *next_free;
+
+   /* Number of threads attached to this arena.  0 if the arena is on
+    * the free list.  Access to this field is serialized by
+    * free_list_lock in arena.c.  */
+
+    size_t attached_threads;
+
+   /* Memory allocated from the system in this arena.  */
+    size_t system_mem;
+    size_t max_system_mem;
 };
 
 void show_chunk(void *chunk_ptr, int free_flag)
