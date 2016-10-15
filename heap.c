@@ -7,6 +7,7 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include<stddef.h>
 #include<pthread.h>
 #include"heap.h"
 
@@ -18,10 +19,10 @@
 #define SMALLBIN_MAX 0x200
 #endif
 
-struct chunk
+typedef struct chunk
 {
-    INTERNAL_SIZE_T      prev_size;   /* Size of previous chunk (if free).  */
-    INTERNAL_SIZE_T      size;        /* Size in bytes, including overhead. */
+    size_t prev_size;                 /* Size of previous chunk (if free).  */
+    size_t size;                      /* Size in bytes, including overhead. */
       
     struct chunk* fd;                 /* double links -- used only if free. */
     struct chunk* bk;
@@ -29,7 +30,7 @@ struct chunk
     /* Only used for large blocks: pointer to next larger size.  */
     struct chunk* fd_nextsize;        /* double links -- used only if free. */
     struct chunk* bk_nextsize;
-}
+} chunk;
 
 /*
  * MALLOC_ALIGNMENT is the minimum alignment for malloc'ed chunks.
@@ -64,10 +65,21 @@ struct chunk
     MINSIZE :                                                      \
     ((req) + SIZE_SZ + MALLOC_ALIGN_MASK) & ~MALLOC_ALIGN_MASK)
 
+/* offset 2 to use otherwise unindexable first 2 bins */
+#define fastbin_index(sz) \
+   ((((unsigned int) (sz)) >> (SIZE_SZ == 8 ? 4 : 3)) - 2)
+
 /* The maximum fastbin request size we support */
 #define MAX_FAST_SIZE     (80 * SIZE_SZ / 4)
 
 #define NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)
+
+
+struct malloc_state
+{
+    pthread_mutex_t mutex;
+    chunk *fastbinsY[NFASTBINS];
+};
 
 void show_chunk(void *chunk_ptr, int free_flag)
 {
@@ -125,11 +137,6 @@ void show_chunk(void *chunk_ptr, int free_flag)
     puts("");
 }
 
-struct malloc_state
-{
-    pthread_mutex_t mutex;
-    chunk *fastbinsY[NFASTBINS];
-};
 
 int main()
 {
