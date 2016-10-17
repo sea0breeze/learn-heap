@@ -72,9 +72,17 @@ typedef struct chunk
 /* The maximum fastbin request size we support */
 #define MAX_FAST_SIZE     (80 * SIZE_SZ / 4)
 
+#ifndef DEFAULT_MXFAST
+#define DEFAULT_MXFAST     (64 * SIZE_SZ / 4)
+#endif
+
 #define NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)
 
 #define NBINS             128
+#define NSMALLBINS         64
+#define SMALLBIN_WIDTH    MALLOC_ALIGNMENT
+#define SMALLBIN_CORRECTION (MALLOC_ALIGNMENT > 2 * SIZE_SZ)
+#define MIN_LARGE_SIZE    ((NSMALLBINS - SMALLBIN_CORRECTION) * SMALLBIN_WIDTH)
 
  /*
    Binmap
@@ -95,6 +103,18 @@ typedef struct chunk
 #define idx2block(i)     ((i) >> BINMAPSHIFT)
 #define idx2bit(i)       ((1U << ((i) & ((1U << BINMAPSHIFT) - 1))))
 
+
+/*
+   Set value of max_fast.
+   Use impossibly small value if 0.
+   Precondition: there are no existing fastbin chunks.
+   Setting the value clears fastchunk bit but preserves noncontiguous bit.
+*/
+
+#define set_max_fast(s) \
+  global_max_fast = (((s) == 0)						      \
+		     ? SMALLBIN_WIDTH: ((s + SIZE_SZ) & ~MALLOC_ALIGN_MASK))
+#define get_max_fast() global_max_fast
 
 struct malloc_state
 {
@@ -119,6 +139,10 @@ struct malloc_state
     size_t system_mem;
     size_t max_system_mem;
 };
+
+/* Maximum size of memory handled in fastbins.  */
+static size_t global_max_fast;
+
 
 void show_chunk(void *chunk_ptr, int free_flag)
 {
@@ -158,7 +182,7 @@ void show_chunk(void *chunk_ptr, int free_flag)
     if (free_flag)
     {
         puts("Show Free Situation: ");
-        if (chunk_size <= MAX_FAST_SIZE) // This threshold is determined by the global varible "max fastbin size" in libc.
+        if (chunk_size <= DEFAULT_MXFAST) // This threshold is determined by the global varible "max fastbin size" in libc.
             printf("\tFD(fastbin): \033[33m0x%lx\033[0m\n", fd);
         else
         {
